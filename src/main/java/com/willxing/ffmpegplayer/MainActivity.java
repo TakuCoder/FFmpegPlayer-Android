@@ -17,6 +17,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         System.loadLibrary("ffmpegplayer-lib");
     }
     Button btnPlay,btnPasue,btnStop,btnReset;
+    Surface surface;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -31,6 +32,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnPasue.setOnClickListener(this);
         btnStop.setOnClickListener(this);
         btnReset.setOnClickListener(this);
+        initSufaceView();
     }
 
     @Override
@@ -52,19 +54,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    public void playUrl(){
-        final String inputurl  = "http://192.168.1.106:8000/Jupiter.mp4";
+    public void playUrl() {
+        final String inputurl = "http://192.168.1.106:8000/Jupiter.mp4";
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                play(inputurl, surface);
+            }
+        }).start();
+    }
+
+    public void initSufaceView(){
         SurfaceView surfaceView = findViewById(R.id.surfaceView);
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(final SurfaceHolder holder) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        play(inputurl, holder.getSurface());
-                    }
-                }).start();
-
+                surface = holder.getSurface();
             }
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
@@ -73,7 +78,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             public void surfaceDestroyed(SurfaceHolder holder) {
             }
         });
-
     }
 
     public native void play(String url, Surface surface);
