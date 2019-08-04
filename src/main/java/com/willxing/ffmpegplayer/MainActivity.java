@@ -18,6 +18,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
     Button btnPlay,btnPasue,btnStop,btnReset;
     Surface surface;
+
+    final String inputurl = "http://192.168.1.106:8000/Jupiter.mp4";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,14 +50,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 stop();
                 break;
             case R.id.btnreset:
-                reset();
+                reset(inputurl);
                 break;
                 default:
         }
     }
 
     public void playUrl() {
-        final String inputurl = "http://192.168.1.106:8000/Jupiter.mp4";
+
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -83,5 +85,5 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public native void play(String url, Surface surface);
     public native void pause();
     public native void stop();
-    public native void reset();
+    public native void reset(String url);
 }
