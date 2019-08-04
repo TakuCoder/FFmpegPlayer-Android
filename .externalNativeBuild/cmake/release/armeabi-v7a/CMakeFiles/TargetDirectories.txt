@@ -1,3 +1,0 @@
-F:/androidproject/ffmpegplayer/.externalNativeBuild/cmake/release/armeabi-v7a/CMakeFiles/ffmpegplayer-lib.dir
-F:/androidproject/ffmpegplayer/.externalNativeBuild/cmake/release/armeabi-v7a/CMakeFiles/edit_cache.dir
-F:/androidproject/ffmpegplayer/.externalNativeBuild/cmake/release/armeabi-v7a/CMakeFiles/rebuild_cache.dir
