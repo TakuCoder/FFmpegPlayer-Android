@@ -3,9 +3,7 @@
 //
 
 #include <android/log.h>
-#include <libavcodec/avcodec.h>
 #include "AudioOpensl.h"
-
 
 AudioOpensl::AudioOpensl() {
 
@@ -36,27 +34,90 @@ AudioOpensl::~AudioOpensl() {
         engineEngine = NULL;
     }
 }
-
- void  bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
+DecodeParam localparams;
+AudioOpensl *audio ;
+void  bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
-    AudioOpensl audio ;
     LOGI("playerCallback");
-    assert(bq == audio.bqPlayerBufferQueue);
-    audio.bufferSize = 0;
+    assert(bq == audio->bqPlayerBufferQueue);
+
+    getPCM(&localparams.buffer, &localparams.bufferSize);;
     //assert(NULL == context);
-//    audio.getPCM(&buffer, &bufferSize);
+//    audio.getPCM(&audio.buffer, &audio.bufferSize);
     // for streaming playback, replace this test by logic to find and fill the next buffer
-    if (NULL != audio.buffer && 0 != audio.bufferSize) {
+    if (NULL != localparams.buffer && 0 != localparams.bufferSize) {
         SLresult result;
         // enqueue another buffer
-        result = (*audio.bqPlayerBufferQueue)->Enqueue(audio.bqPlayerBufferQueue, audio.buffer,
-                                                       audio.bufferSize);
+        result = (*audio->bqPlayerBufferQueue)->Enqueue(audio->bqPlayerBufferQueue, localparams.buffer,
+                                                       localparams.bufferSize);
         // the most likely other result is SL_RESULT_BUFFER_INSUFFICIENT,
         // which for this code example would indicate a programming error
         assert(SL_RESULT_SUCCESS == result);
         LOGI("Enqueue:%d", result);
         (void)result;
     }
+}
+
+void  initDecodePCM(DecodeParam params,AudioOpensl *aa){
+    localparams = params;
+    audio = aa;
+}
+
+void getPCM(void **pcm, size_t *pcmSize) {
+    LOGE("player_play_audio ==1");
+    AVPacket *avPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
+    int i_time =0;
+    int frameNumber = 120;
+    int  data_size_all = 0;
+
+    void *buffer = localparams.buff;
+    size_t bufferSize  = localparams.bufferSize;
+    AVFormatContext* avformat_context  = localparams.avformat_context;
+    AVCodecContext*  avcodec_context  = localparams.avcodec_context;
+    AVPacketQueue* queue = localparams.queue;
+    int audioStream = localparams. audioStream;
+    SwrContext * swr = localparams. swr;
+    uint8_t * outputBuffer = localparams.outputBuffer;
+    size_t  outputBufferSize  = localparams.outputBufferSize;
+    uint8_t * buff = localparams.  buff;
+
+    outputBufferSize = 8192 ;
+    outputBuffer = (uint8_t *) malloc(sizeof(uint8_t) * outputBufferSize * frameNumber);
+    uint8_t *tmp = outputBuffer;
+    while((&queue->audio_packets)->size() > 0 && i_time < frameNumber) {
+        queue->get_audio_packet(avPacket);
+        LOGE("player_play_audio ==  %d  === %d", avPacket->pts, &avPacket);
+        AVFrame *aFrame = av_frame_alloc();
+        int frameFinished = 0;
+        // Is this a packet from the audio stream?
+        if ((avPacket->stream_index) == audioStream) {
+            avcodec_decode_audio4(avcodec_context, aFrame, &frameFinished, avPacket);
+
+            if (frameFinished) {
+                // data_size为音频数据所占的字节数
+                int data_size_in = av_samples_get_buffer_size(
+                        aFrame->linesize, avcodec_context->channels,
+                        aFrame->nb_samples, avcodec_context->sample_fmt, 1);
+
+                int data_size_out = av_samples_get_buffer_size(
+                        aFrame->linesize, avcodec_context->channels,
+                        aFrame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+//                // 音频格式转换
+                uint8_t *buff = (uint8_t *) av_malloc(data_size_out);
+                swr_convert(swr, &buff, aFrame->nb_samples,
+                            (const uint8_t **) aFrame->extended_data,
+                            aFrame->nb_samples);
+
+                data_size_all += data_size_out;
+                memcpy(tmp,buff,data_size_out);
+                tmp = tmp + data_size_out;
+                i_time++;
+                LOGE("memcpy data_size_all ==  %d  data_size_out === %d", data_size_all,data_size_out);
+            }
+        }
+    }
+    *pcm = outputBuffer;
+    *pcmSize = data_size_all;
 }
 
 
@@ -176,7 +237,4 @@ void AudioOpensl::AudioWrite(const void*buffer, int size)
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, buffer, size);
 }
 
-void AudioOpensl::getPCM(void **pVoid, size_t *pInt) {
-    buffer = *pVoid;
-    bufferSize = *pInt;
-}
+

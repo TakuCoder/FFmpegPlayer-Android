@@ -36,7 +36,7 @@ int AVPacketQueue::get_video_packet(AVPacket *avPacket) {
 int AVPacketQueue::put_packet(queue<AVPacket *> *queue_,AVPacket *avPacket) {
     pthread_mutex_lock(&mutex);
     queue_->push(avPacket);
-    LOGI("put_packet = %d" , queue_->size());
+    LOGI("put_packet = %d  ===%d" , queue_->size(),avPacket->pts);
     pthread_cond_signal(&cond);
     pthread_mutex_unlock(&mutex);
     return 0;
@@ -48,9 +48,11 @@ int AVPacketQueue::get_packet(queue<AVPacket *>  *queue_,AVPacket *avPacket) {
     if(queue_->size() > 0 && stop != 0) {
 //        LOGI("get_packet ===========2============ %d" , queue_->size());
         AVPacket *pkt = queue_->front();
+        LOGI("get_packet = %d  ===%d  pkt===%d   " , queue_->size(),avPacket->pts,pkt->pts);
         if (av_packet_ref(avPacket, pkt) == 0) {
             queue_->pop();
         }
+//        LOGI("get_packet = %d  ===%d  pkt===%d   " , queue_->size(),avPacket->pts,pkt->pts);
 //        LOGI("get_packet ============3=========== %d" , queue_->size());
 //        av_packet_free(&pkt);
 //        av_free(pkt);

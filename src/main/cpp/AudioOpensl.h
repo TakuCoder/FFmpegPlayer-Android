@@ -9,12 +9,19 @@
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 #include <assert.h>
-
+#include "AVPacketQueue.h"
+extern "C"
+{
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswresample/swresample.h>
+}
 
 #define LOGE(format, ...)  __android_log_print(ANDROID_LOG_ERROR, "will_e", format, ##__VA_ARGS__)
 #define LOGI(format, ...)  __android_log_print(ANDROID_LOG_INFO,  "will_i", format, ##__VA_ARGS__)
 
-void  bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context);
+
+
 
 class AudioOpensl {
 
@@ -47,8 +54,6 @@ public:
      SLMuteSoloItf fdPlayerMuteSolo;
      SLVolumeItf fdPlayerVolume;
 
-     void *buffer;
-     size_t bufferSize;
 
 public:
     AudioOpensl();
@@ -64,8 +69,25 @@ public:
 
     void AudioWrite(const void *buffer, int size);
 
-    void getPCM(void **pVoid, size_t *pInt);
+
+
 };
 
+struct DecodeParam{
+    void *buffer;
+    size_t bufferSize;
+    AVFormatContext *avformat_context;
+    AVCodecContext *avcodec_context;
+    AVPacketQueue *queue;
+    int audioStream;
+    SwrContext *swr;
+    uint8_t *outputBuffer;
+    size_t outputBufferSize;
+    uint8_t *buff;
+
+};
+void  initDecodePCM(DecodeParam params,AudioOpensl *audioOpensl);
+void  getPCM(void **pVoid, size_t *pInt);
+void  bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context);
 
 #endif //ANDROIDPROJECT_AUDIO_H

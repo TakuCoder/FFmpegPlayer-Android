@@ -16,13 +16,16 @@ add_library( # Specifies the name of the library.
              SHARED
              # Provides a relative path to your source file(s).
              src/main/cpp/ffmpeg_player.cpp
+        src/main/cpp/ffmpeg_player.h
         src/main/cpp/AVPacketQueue.h
         src/main/cpp/AVPacketQueue.cpp
         src/main/cpp/Player.h
         src/main/cpp/Player.cpp
         src/main/cpp/AudioOpensl.cpp
         src/main/cpp/AudioOpensl.h
-            )
+        src/main/cpp/DecodeTools.cpp
+        src/main/cpp/DecodeTools.h
+        )
 find_library(
         log-lib
         log)

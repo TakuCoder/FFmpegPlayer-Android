@@ -2,26 +2,8 @@
 // Created by saite on 2019/7/22.
 //
 
-#include <jni.h>
-#include <string>
+#include "ffmpeg_player.h"
 
-#include <android/log.h>
-#include <android/native_window.h>
-#include <android/native_window_jni.h>
-#include "Player.h"
-
-//extern "C"
-//{
-//#include <libavcodec/avcodec.h>
-//#include <libavformat/avformat.h>
-//#include <libavutil/imgutils.h>
-//#include <libavutil/frame.h>
-//#include <libswscale/swscale.h>
-//
-//}
-
-#define LOGE(format, ...)  __android_log_print(ANDROID_LOG_ERROR, "will_e", format, ##__VA_ARGS__)
-#define LOGI(format, ...)  __android_log_print(ANDROID_LOG_INFO,  "will_i", format, ##__VA_ARGS__)
 
 
 //extern "C"

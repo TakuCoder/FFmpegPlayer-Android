@@ -3,8 +3,9 @@
 //
 
 #include "Player.h"
-#include "AudioOpensl.h"
 #include <android/log.h>
+
+
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -50,11 +51,14 @@ int Player::prepare(const  char *input_str ) {
     }
      LOGE("init_stream ==  %d", idx);
     if (idx == -1) return -1;
+    if(type == AVMEDIA_TYPE_AUDIO){
+        audioStream = idx;
+    }
     avcodec_context = avformat_context->streams[idx]->codec;
     AVCodec *decoder = avcodec_find_decoder(avcodec_context->codec_id);
      LOGE("init_stream ==  %d", avcodec_context->codec_id );
     AVFrame *vFrame = av_frame_alloc();
-    AVPacket *avPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
+    AVPacket *avPacket = av_packet_alloc();
      LOGE("init_stream == 3");
     if (decoder == NULL) {
         LOGE("Couldn't find Codec.\n");
@@ -73,7 +77,8 @@ int Player::prepare(const  char *input_str ) {
             if (avPacket->stream_index == idx) {
                 queue->put_aduio_packet(avPacket);
             }
-            av_packet_unref(avPacket);
+//            av_packet_unref(avPacket);
+            avPacket = av_packet_alloc();
         }
         LOGE("init_stream == 7");
     }else  if(type == AVMEDIA_TYPE_VIDEO) {
@@ -83,6 +88,7 @@ int Player::prepare(const  char *input_str ) {
                 queue->put_video_packet(avPacket);
             }
             av_packet_unref(avPacket);
+            avPacket = av_packet_alloc();
         }
     }
      LOGE("init_stream == 8");
@@ -90,18 +96,10 @@ int Player::prepare(const  char *input_str ) {
 }
 
 void Player::player_play_audio() {
-    LOGE("player_play_audio ==1");
-    AVPacket *avPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
-    while((&queue->audio_packets)->size() > 0) {
-        LOGE("player_play_audio ==  %d",avPacket->pts);
-        queue->get_audio_packet(avPacket);
-    }
-    LOGE("player_play_audio ==3");
-//    queue->stop = 0;
+    bqPlayerCallback(audioOpensl->bqPlayerBufferQueue, NULL);
 }
 
 void Player::InitOpenSL(JNIEnv *env,jclass  clz){
-    AudioOpensl *audioOpensl;
     audioOpensl = new AudioOpensl();
     int rate, channel,simpleFmt;
     // 创建FFmpeg音频解码器
@@ -115,7 +113,22 @@ void Player::InitOpenSL(JNIEnv *env,jclass  clz){
 ////    getPCM(&buffer,&bufferSize);
 //    // 启动音频播放
 //    audio->bqPlayerCallback(audio.bqPlayerBufferQueue, NULL);
-//    bqPlayerCallback(audioOpensl.bqPlayerBufferQueue, NULL);
+
+}
+
+void initParam(Player * player,AudioOpensl *audioOpensl){
+    DecodeParam d ;
+    d.buffer = player->buff;
+    d.bufferSize  = 0;
+    d.avformat_context  = player->avformat_context;
+    d.avcodec_context  = player->avcodec_context;
+    d.queue = player->queue;
+    d.audioStream = player->audioStream;
+    d.swr = player->swr;
+    d.outputBuffer = player->outputBuffer;
+    d.outputBufferSize  = player->outputBufferSize;
+    d.buff = player->buff;
+    initDecodePCM(d,audioOpensl);
 }
 
 int Player::createFFmpegAudioPlay(int *rate,int *channel,int *simpleFmt){
@@ -123,5 +136,61 @@ int Player::createFFmpegAudioPlay(int *rate,int *channel,int *simpleFmt){
     *rate = avcodec_context->sample_rate;
     *channel = avcodec_context->channels;
     *simpleFmt = avcodec_context->sample_fmt;
+
+    swr = swr_alloc();
+    swr =  swr_alloc_set_opts(swr, avcodec_context->channel_layout, AV_SAMPLE_FMT_S16, avcodec_context->sample_rate,
+                              avcodec_context->channel_layout, avcodec_context->sample_fmt, avcodec_context->sample_rate, 0, NULL);
+
+    swr_init(swr);
+    initParam(this,audioOpensl);
     return 0;
 }
+
+
+
+//void Player::getPCM(void **pcm, size_t *pcmSize) {
+//    LOGE("player_play_audio ==1");
+//    AVPacket *avPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
+//    int i_time =0;
+//    int frameNumber = 120;
+//    int  data_size_all = 0;
+//
+//    outputBufferSize = 8192 ;
+//    outputBuffer = (uint8_t *) malloc(sizeof(uint8_t) * outputBufferSize * frameNumber);
+//    uint8_t *tmp = outputBuffer;
+//    while((&queue->audio_packets)->size() > 0 && i_time < frameNumber) {
+//        queue->get_audio_packet(avPacket);
+//        LOGE("player_play_audio ==  %d  === %d", avPacket->pts, &avPacket);
+//        AVFrame *aFrame = av_frame_alloc();
+//        int frameFinished = 0;
+//        // Is this a packet from the audio stream?
+//        if ((avPacket->stream_index) == audioStream) {
+//            avcodec_decode_audio4(avcodec_context, aFrame, &frameFinished, avPacket);
+//
+//            if (frameFinished) {
+//                // data_size为音频数据所占的字节数
+//                int data_size_in = av_samples_get_buffer_size(
+//                        aFrame->linesize, avcodec_context->channels,
+//                        aFrame->nb_samples, avcodec_context->sample_fmt, 1);
+//
+//                int data_size_out = av_samples_get_buffer_size(
+//                        aFrame->linesize, avcodec_context->channels,
+//                        aFrame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+////                // 音频格式转换
+//                uint8_t *buff = (uint8_t *) av_malloc(data_size_out);
+//                swr_convert(swr, &buff, aFrame->nb_samples,
+//                            (const uint8_t **) aFrame->extended_data,
+//                            aFrame->nb_samples);
+//
+//                data_size_all += data_size_out;
+//                memcpy(tmp,buff,data_size_out);
+//                tmp = tmp + data_size_out;
+//                i_time++;
+//            }
+//        }
+//    }
+//    *pcm = outputBuffer;
+//    *pcmSize = data_size_all;
+//}
+
+
