@@ -69,7 +69,7 @@
 //        (JNIEnv *env, jobject obj, jstring input_jstr, jstring output_jstr)
 //{
 //    AVFormatContext	*pFormatCtx;
-//    int				i, videoindex;
+//    int				i, videoStreamindex;
 //    AVCodecContext	*pCodecCtx;
 //    AVCodec			*pCodec;
 //    AVFrame	*pFrame,*pFrameYUV;
@@ -101,17 +101,17 @@
 //        LOGE("Couldn't find stream information.\n");
 //        return -1;
 //    }
-//    videoindex=-1;
+//    videoStreamindex=-1;
 //    for(i=0; i<pFormatCtx->nb_streams; i++)
 //        if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
-//            videoindex=i;
+//            videoStreamindex=i;
 //            break;
 //        }
-//    if(videoindex==-1){
+//    if(videoStreamindex==-1){
 //        LOGE("Couldn't find a video stream.\n");
 //        return -1;
 //    }
-//    pCodecCtx=pFormatCtx->streams[videoindex]->codec;
+//    pCodecCtx=pFormatCtx->streams[videoStreamindex]->codec;
 //    pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
 //    if(pCodec==NULL){
 //        LOGE("Couldn't find Codec.\n");
@@ -142,7 +142,7 @@
 //    frame_cnt=0;
 //    time_start = clock();
 //    while(av_read_frame(pFormatCtx, packet)>=0){
-//        if(packet->stream_index==videoindex){
+//        if(packet->stream_index==videoStreamindex){
 //            ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
 //            if(ret < 0){
 //                LOGE("Decode Error.\n");
@@ -215,7 +215,7 @@
 //Java_com_willxing_example_FFmpegActivity_play
 //        (JNIEnv *env, jobject obj, jstring input_jstr, jobject surface) {
 //    AVFormatContext *pFormatCtx;
-//    int i, videoindex;
+//    int i, videoStreamindex;
 //    AVCodecContext *pCodecCtx;
 //    AVCodec *pCodec;
 //    struct SwsContext *img_convert_ctx;
@@ -232,17 +232,17 @@
 //        LOGE("Couldn't find stream information.\n");
 //        return -1;
 //    }
-//    videoindex = -1;
+//    videoStreamindex = -1;
 //    for (i = 0; i < pFormatCtx->nb_streams; i++)
 //        if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-//            videoindex = i;
+//            videoStreamindex = i;
 //            break;
 //        }
-//    if (videoindex == -1) {
+//    if (videoStreamindex == -1) {
 //        LOGE("Couldn't find a video stream.\n");
 //        return -1;
 //    }
-//    pCodecCtx = pFormatCtx->streams[videoindex]->codec;
+//    pCodecCtx = pFormatCtx->streams[videoStreamindex]->codec;
 //    pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
 //    LOGE("pCodecCtx ==  %d" ,pCodecCtx->codec_id );
 //    if (pCodec == NULL) {
@@ -275,7 +275,7 @@
 //    }
 //    //读取帧
 //    while (av_read_frame(pFormatCtx, vPacket) >= 0) {
-//        if (vPacket->stream_index == videoindex) {
+//        if (vPacket->stream_index == videoStreamindex) {
 //            //视频解码
 //            int ret = avcodec_send_packet(pCodecCtx, vPacket);
 //            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -318,7 +318,7 @@ JNIEXPORT void JNICALL
 Java_com_willxing_ffmpegplayer_MainActivity_play(JNIEnv *env, jclass clz, jstring url_,
                                                  jobject surface) {
 
-    player->player_play_audio();
+    player->player_play_audio(env,clz,url_,surface);
 
 }extern "C"
 JNIEXPORT void JNICALL
@@ -338,7 +338,9 @@ Java_com_willxing_ffmpegplayer_MainActivity_reset(JNIEnv *env, jclass clz,jstrin
     LOGE("video Java_com_willxing_ffmpegplayer_MainActivity_reset error %d", 1);
     const char * url = env->GetStringUTFChars(url_, 0);
 //    Java_com_willxing_example_FFmpegActivity_play(env,instance,url_,surface);
-    env->ReleaseStringUTFChars(url_, url);
+//    env->ReleaseStringUTFChars(url_, url);
+    LOGE("open input stream.  == %s",url_ );
+    LOGE("open input stream.  ====== %s",url );
     player = new Player(env,clz,url);
     player->prepare(url);
     player->InitOpenSL(env,clz);

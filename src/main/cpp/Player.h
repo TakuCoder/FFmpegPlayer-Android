@@ -10,6 +10,8 @@
 #include <jni.h>
 #include "AVPacketQueue.h"
 #include "AudioOpensl.h"
+#include <android/native_window.h>
+#include <android/native_window_jni.h>
 
 extern "C"
 {
@@ -17,21 +19,22 @@ extern "C"
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
 }
+int  play_video(JNIEnv *env, jobject surface , AVFormatContext	*pFormatCtx,AVCodecContext	*pCodecCtx,int videoindex,AVPacketQueue *video_queue);
 
+void putPacketToQueue(AVFormatContext *avformat_context,AVPacketQueue *queue,int audioStreamindex,int videoStreamindex);
 
 class Player {
-    AudioOpensl a;//两个类互相引用
     public:
         AVFormatContext *avformat_context;
-        AVCodecContext *avcodec_context;
-
+        AVCodecContext *avcodec_audio_context;
+         AVCodecContext *avcodec_video_context;
         pthread_t avdemux_thead;
         pthread_t audio_decode_thead;
         pthread_t vedio_decode_thead;
 
         AVPacketQueue *queue;
-
-        int audioStream;
+        int videoStreamindex;
+        int audioStreamindex;
 
         SwrContext *swr;
 
@@ -39,18 +42,15 @@ class Player {
 
         AudioOpensl *audioOpensl;
 
-        uint8_t *outputBuffer;
-        size_t outputBufferSize;
-        uint8_t *buff;
-
-    public:
+public:
         Player(JNIEnv *env, jclass clz,const char *url);
 
         ~Player();
 
         void player_play();
 
-        void player_play_audio();
+        void player_play_audio(JNIEnv *env, jclass clz, jstring url_,
+                               jobject surface);
 
         void player_play_video();
 
@@ -71,5 +71,9 @@ class Player {
         void getPCM(void **pcm, size_t *pcmSize);
     };
 
+struct QueueTools{
+    AVPacketQueue *quque;
+    AVPacket *avPacket;
+};
 
 #endif //ANDROIDPROJECT_PLAYER_H

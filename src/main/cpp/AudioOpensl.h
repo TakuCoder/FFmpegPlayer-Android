@@ -10,6 +10,7 @@
 #include <SLES/OpenSLES_Android.h>
 #include <assert.h>
 #include "AVPacketQueue.h"
+#include <pthread.h>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -74,17 +75,11 @@ public:
 };
 
 struct DecodeParam{
-    void *buffer;
-    size_t bufferSize;
     AVFormatContext *avformat_context;
     AVCodecContext *avcodec_context;
     AVPacketQueue *queue;
     int audioStream;
     SwrContext *swr;
-    uint8_t *outputBuffer;
-    size_t outputBufferSize;
-    uint8_t *buff;
-
 };
 void  initDecodePCM(DecodeParam params,AudioOpensl *audioOpensl);
 void  getPCM(void **pVoid, size_t *pInt);
