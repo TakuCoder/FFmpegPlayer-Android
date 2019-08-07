@@ -66,13 +66,16 @@ void  initDecodePCM(DecodeParam params,AudioOpensl *aa){
     localparams = params;
     audio = aa;
 }
-
+int frameNumber = 120;
+size_t  outputBufferSize = 8192 ;
+uint8_t * outputBuffer = (uint8_t *) malloc(sizeof(uint8_t) * outputBufferSize * frameNumber);
 void getPCM(void **pcm, size_t *pcmSize) {
     LOGE("player_play_audio ==1");
     AVPacket *avPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
     int i_time =0;
-    int frameNumber = 120;
+
     int  data_size_all = 0;
+
 
     AVFormatContext* avformat_context  = localparams.avformat_context;
     AVCodecContext*  avcodec_context  = localparams.avcodec_context;
@@ -80,8 +83,6 @@ void getPCM(void **pcm, size_t *pcmSize) {
     int audioStream = localparams. audioStream;
     SwrContext * swr = localparams. swr;
     uint8_t * buff;
-    size_t  outputBufferSize = 8192 ;
-    uint8_t * outputBuffer = (uint8_t *) malloc(sizeof(uint8_t) * outputBufferSize * frameNumber);
     uint8_t *tmp = outputBuffer;
     while((&queue->audio_packets)->size() > 0 && i_time < frameNumber) {
         queue->get_audio_packet(avPacket);
@@ -109,12 +110,14 @@ void getPCM(void **pcm, size_t *pcmSize) {
 
                 data_size_all += data_size_out;
                 memcpy(tmp,buff,data_size_out);
+                av_free(buff);
                 tmp = tmp + data_size_out;
                 i_time++;
                 LOGE("memcpy data_size_all ==  %d  data_size_out === %d", data_size_all,data_size_out);
             }
         }
         av_packet_unref(avPacket);
+//        av_free(avPacket);
     }
     *pcm = outputBuffer;
     *pcmSize = data_size_all;
@@ -202,12 +205,12 @@ void AudioOpensl::createBufferQueueAudioPlayer(JNIEnv* env, jclass clazz, int ra
     result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_PLAY, &bqPlayerPlay);
     assert(SL_RESULT_SUCCESS == result);
 
-    // get the buffer queue interface
+    // get the buffer avPacketQueue interface
     result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_BUFFERQUEUE,
                                              &bqPlayerBufferQueue);
     assert(SL_RESULT_SUCCESS == result);
 
-    // register callback on the buffer queue
+    // register callback on the buffer avPacketQueue
     result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue,bqPlayerCallback, NULL);
     assert(SL_RESULT_SUCCESS == result);
 

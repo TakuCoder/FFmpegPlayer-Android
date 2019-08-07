@@ -719,7 +719,7 @@ void avfilter_register_all(void);
  * filter can still by instantiated with avfilter_graph_alloc_filter even if it
  * is not registered.
  *
- * @param filter the filter to register
+ * @playerParam filter the filter to register
  * @return 0 if the registration was successful, a negative value
  * otherwise
  */

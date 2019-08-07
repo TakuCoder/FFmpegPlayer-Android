@@ -29,8 +29,8 @@
  * you can call multiple times av_jni_set_java_vm with the same Java VM pointer
  * however it will error out if you try to set a different Java VM.
  *
- * @param vm Java virtual machine
- * @param log_ctx context used for logging, can be NULL
+ * @playerParam vm Java virtual machine
+ * @playerParam log_ctx context used for logging, can be NULL
  * @return 0 on success, < 0 otherwise
  */
 int av_jni_set_java_vm(void *vm, void *log_ctx);
@@ -38,7 +38,7 @@ int av_jni_set_java_vm(void *vm, void *log_ctx);
 /*
  * Get the Java virtual machine which has been set with av_jni_set_java_vm.
  *
- * @param vm Java virtual machine
+ * @playerParam vm Java virtual machine
  * @return a pointer to the Java virtual machine
  */
 void *av_jni_get_java_vm(void *log_ctx);

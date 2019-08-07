@@ -20,30 +20,48 @@ extern "C"
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "will_I", __VA_ARGS__))
 
 
-Player::Player(JNIEnv *env, jclass clz,const char *url) {
-    queue = new AVPacketQueue();
-//    prepare(url);
-}
 
-int Player::prepare(const  char *input_str ) {
+
+pthread_t avdemux_thead;
+pthread_t audio_decode_thead;
+pthread_t vedio_decode_thead;
+
+AVPacketQueue *avPacketQueue;
+
+struct FFmpeg_param {
+    AVFormatContext *avformat_context;
+    AVCodecContext *avcodec_audio_context;
+    AVCodecContext *avcodec_video_context;
+    int videoStreamindex;
+    int audioStreamindex;
+};
+
+FFmpeg_param * playerParam = (FFmpeg_param*)calloc(1, sizeof(FFmpeg_param));
+SwrContext *swr;
+void *packetQueue;
+AudioOpensl *audioOpensl;
+
+int prepare(const  char *input_str ) {
+    avPacketQueue = new AVPacketQueue();
     av_register_all();
-    avformat_context = avformat_alloc_context();
+    playerParam->avformat_context = avformat_alloc_context();
     LOGE("open input stream.  == %s",input_str );
-    if (avformat_open_input(&avformat_context, input_str, NULL, NULL) != 0) {
+    if (avformat_open_input(& playerParam->avformat_context, input_str, NULL, NULL) != 0) {
         LOGE("Couldn't open input stream.\n");
         return -1;
     }
-    if (avformat_find_stream_info(avformat_context, NULL) < 0) {
+    if (avformat_find_stream_info( playerParam->avformat_context, NULL) < 0) {
         LOGE("Couldn't find stream information.\n");
         return -1;
     }
-    init_stream(avformat_context,AVMEDIA_TYPE_VIDEO,-1);
-    init_stream(avformat_context,AVMEDIA_TYPE_AUDIO,-1);
-    putPacketToQueue(avformat_context,queue,audioStreamindex,videoStreamindex);
+    init_stream( playerParam->avformat_context,AVMEDIA_TYPE_VIDEO,-1);
+    init_stream( playerParam->avformat_context,AVMEDIA_TYPE_AUDIO,-1);
+    pthread_create(&avdemux_thead,NULL,putPacketToQueue,playerParam);
+//    putPacketToQueue(avformat_context,avPacketQueue,audioStreamindex,videoStreamindex);
     return 0;
 }
 
- int Player::init_stream(AVFormatContext *avformat_context, enum AVMediaType type, int sel) {
+ int init_stream(AVFormatContext *avformat_context, enum AVMediaType type, int sel) {
      AVCodecContext *avcodec_context;
     int idx = -1, cur = -1;
     for (int i = 0; i < avformat_context->nb_streams; i++) {
@@ -55,11 +73,11 @@ int Player::prepare(const  char *input_str ) {
      LOGE("init_stream ==  %d", idx);
     if (idx == -1) return -1;
     if(type == AVMEDIA_TYPE_AUDIO){
-        audioStreamindex = idx;
-        avcodec_audio_context = avcodec_context = avformat_context->streams[idx]->codec;
+        playerParam->audioStreamindex = idx;
+        playerParam->avcodec_audio_context = avcodec_context = avformat_context->streams[idx]->codec;
     }else if(type == AVMEDIA_TYPE_VIDEO){
-        videoStreamindex = idx;
-        avcodec_video_context =   avcodec_context = avformat_context->streams[idx]->codec;
+        playerParam->videoStreamindex = idx;
+        playerParam->avcodec_video_context =   avcodec_context = avformat_context->streams[idx]->codec;
     }
      avcodec_context = avformat_context->streams[idx]->codec;
     AVCodec *decoder = avcodec_find_decoder(avcodec_context->codec_id);
@@ -82,7 +100,7 @@ int Player::prepare(const  char *input_str ) {
 //        //读取帧
 //        while (av_read_frame(avformat_context, avPacket) >= 0) {
 //            if (avPacket->stream_index == idx) {
-//                queue->put_aduio_packet(avPacket);
+//                avPacketQueue->put_aduio_packet(avPacket);
 //            }
 ////            av_packet_unref(avPacket);
 //            avPacket = av_packet_alloc();
@@ -92,7 +110,7 @@ int Player::prepare(const  char *input_str ) {
 //        while (av_read_frame(avformat_context, avPacket) >= 0) {
 ////            LOGI("av_read_frame  idx = %d" , idx);
 //            if (avPacket->stream_index == idx) {
-//                queue->put_video_packet(avPacket);
+//                avPacketQueue->put_video_packet(avPacket);
 //            }
 ////            av_packet_unref(avPacket);
 //            avPacket = av_packet_alloc();
@@ -102,28 +120,30 @@ int Player::prepare(const  char *input_str ) {
     return 0;
 }
 
-void putPacketToQueue(AVFormatContext *avformat_context,AVPacketQueue *queue,int audioStreamindex,int videoStreamindex){
+void * putPacketToQueue(void *param){
+//    FFmpeg_param * playerParam = (FFmpeg_param *) param;
     AVPacket *avPacket = av_packet_alloc();
-    while (av_read_frame(avformat_context, avPacket) >= 0) {
-        if (avPacket->stream_index == audioStreamindex) {
-            queue->put_aduio_packet(avPacket);
+
+    while (av_read_frame(playerParam->avformat_context, avPacket) >= 0) {
+        if (avPacket->stream_index == playerParam->audioStreamindex) {
+            avPacketQueue->put_aduio_packet(avPacket);
         }
 
-        if (avPacket->stream_index == videoStreamindex) {
-            queue->put_video_packet(avPacket);
+        if (avPacket->stream_index == playerParam->videoStreamindex) {
+            avPacketQueue->put_video_packet(avPacket);
         }
-//            av_packet_unref(avPacket);
         avPacket = av_packet_alloc();
     }
+    return NULL;
 }
 
-void Player::player_play_audio(JNIEnv *env, jclass clz, jstring url_,
+void player_play_audio(JNIEnv *env, jclass clz, jstring url_,
                                jobject surface) {
     bqPlayerCallback(audioOpensl->bqPlayerBufferQueue, NULL);
-    play_video(env,surface,avformat_context,avcodec_video_context,videoStreamindex,queue);
+    play_video(env,surface,playerParam->avformat_context,playerParam->avcodec_video_context,playerParam->videoStreamindex,avPacketQueue);
 }
 
-void Player::InitOpenSL(JNIEnv *env,jclass  clz){
+void InitOpenSL(JNIEnv *env,jclass  clz){
     audioOpensl = new AudioOpensl();
     int rate, channel,simpleFmt;
     // 创建FFmpeg音频解码器
@@ -140,29 +160,29 @@ void Player::InitOpenSL(JNIEnv *env,jclass  clz){
 
 }
 
-void initParam(Player * player,AudioOpensl *audioOpensl){
+void initParam(AudioOpensl *audioOpensl){
     DecodeParam d ;
-    d.avformat_context  = player->avformat_context;
-    d.avcodec_context  = player->avcodec_audio_context;
-    d.queue = player->queue;
-    d.audioStream = player->audioStreamindex;
-    d.swr = player->swr;
+    d.avformat_context  = playerParam->avformat_context;
+    d.avcodec_context  = playerParam->avcodec_audio_context;
+    d.queue = avPacketQueue;
+    d.audioStream = playerParam->audioStreamindex;
+    d.swr = swr;
 
     initDecodePCM(d,audioOpensl);
 }
 
-int Player::createFFmpegAudioPlay(int *rate,int *channel,int *simpleFmt){
+int createFFmpegAudioPlay(int *rate,int *channel,int *simpleFmt){
     // 返回sample rate和channels
-    *rate = avcodec_audio_context->sample_rate;
-    *channel = avcodec_audio_context->channels;
-    *simpleFmt = avcodec_audio_context->sample_fmt;
+    *rate = playerParam->avcodec_audio_context->sample_rate;
+    *channel = playerParam->avcodec_audio_context->channels;
+    *simpleFmt = playerParam->avcodec_audio_context->sample_fmt;
 
     swr = swr_alloc();
-    swr =  swr_alloc_set_opts(swr, avcodec_audio_context->channel_layout, AV_SAMPLE_FMT_S16, avcodec_audio_context->sample_rate,
-                              avcodec_audio_context->channel_layout, avcodec_audio_context->sample_fmt, avcodec_audio_context->sample_rate, 0, NULL);
+    swr =  swr_alloc_set_opts(swr, playerParam->avcodec_audio_context->channel_layout, AV_SAMPLE_FMT_S16, playerParam->avcodec_audio_context->sample_rate,
+                              playerParam->avcodec_audio_context->channel_layout, playerParam->avcodec_audio_context->sample_fmt, playerParam->avcodec_audio_context->sample_rate, 0, NULL);
 
     swr_init(swr);
-    initParam(this,audioOpensl);
+    initParam(audioOpensl);
     return 0;
 }
 
@@ -224,13 +244,14 @@ int  play_video(JNIEnv *env, jobject surface , AVFormatContext	*pFormatCtx,AVCod
                 LOGE("cannot lock window");
                 return -1;
             } else {
-                av_image_fill_arrays(pFrameRGBA->data, pFrameRGBA->linesize,
+                 av_image_fill_arrays(pFrameRGBA->data, pFrameRGBA->linesize,
                                      (const uint8_t *) windowBuffer.bits, AV_PIX_FMT_RGBA,
                                      width, height, 1);
                 ANativeWindow_unlockAndPost(nativeWindow);
             }
         }
         av_packet_unref(vPacket);
+//        av_free(vPacket);
     }
     //释放内存
 //    sws_freeContext(img_convert_ctx);

@@ -41,7 +41,7 @@ public:
    int get_packet( queue<AVPacket *> *queue_,AVPacket *avPacket);
     void clearPackets();
 
-//    int size(queue<AVPacket *> *queue_);
+//    int size(avPacketQueue<AVPacket *> *queue_);
 //    int size_audio();
 //    int size_video();
 

@@ -19,59 +19,38 @@ extern "C"
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
 }
-int  play_video(JNIEnv *env, jobject surface , AVFormatContext	*pFormatCtx,AVCodecContext	*pCodecCtx,int videoindex,AVPacketQueue *video_queue);
 
-void putPacketToQueue(AVFormatContext *avformat_context,AVPacketQueue *queue,int audioStreamindex,int videoStreamindex);
+int play_video(JNIEnv *env, jobject surface, AVFormatContext *pFormatCtx, AVCodecContext *pCodecCtx,
+               int videoindex, AVPacketQueue *video_queue);
 
-class Player {
-    public:
-        AVFormatContext *avformat_context;
-        AVCodecContext *avcodec_audio_context;
-         AVCodecContext *avcodec_video_context;
-        pthread_t avdemux_thead;
-        pthread_t audio_decode_thead;
-        pthread_t vedio_decode_thead;
+void * putPacketToQueue(void *param);
 
-        AVPacketQueue *queue;
-        int videoStreamindex;
-        int audioStreamindex;
 
-        SwrContext *swr;
 
-        void *packetQueue;
+void player_play();
 
-        AudioOpensl *audioOpensl;
+void player_play_audio(JNIEnv *env, jclass clz, jstring url_,
+                       jobject surface);
 
-public:
-        Player(JNIEnv *env, jclass clz,const char *url);
+void player_play_video();
 
-        ~Player();
+int prepare(const char *input_str);
 
-        void player_play();
+void pause();
 
-        void player_play_audio(JNIEnv *env, jclass clz, jstring url_,
-                               jobject surface);
+void stop();
 
-        void player_play_video();
+void reset();
 
-        int prepare(const  char *input_str);
+int init_stream(AVFormatContext *avformat_context, AVMediaType type, int sel);
 
-        void pause();
+void InitOpenSL(JNIEnv *env, jclass clz);
 
-        void stop();
+int createFFmpegAudioPlay(int *rate, int *channel, int *simpleFmt);
 
-        void reset();
+//void getPCM(void **pcm, size_t *pcmSize);
 
-        int init_stream(AVFormatContext *avformat_context, AVMediaType type, int sel);
-
-        void InitOpenSL(JNIEnv *env, jclass clz);
-
-        int createFFmpegAudioPlay(int *rate, int *channel, int *simpleFmt);
-
-        void getPCM(void **pcm, size_t *pcmSize);
-    };
-
-struct QueueTools{
+struct QueueTools {
     AVPacketQueue *quque;
     AVPacket *avPacket;
 };

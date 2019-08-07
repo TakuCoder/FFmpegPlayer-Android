@@ -312,13 +312,13 @@
 //    avformat_close_input(&pFormatCtx);
 //    return 0;
 //}
-Player * player = nullptr;
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_willxing_ffmpegplayer_MainActivity_play(JNIEnv *env, jclass clz, jstring url_,
                                                  jobject surface) {
 
-    player->player_play_audio(env,clz,url_,surface);
+    player_play_audio(env,clz,url_,surface);
 
 }extern "C"
 JNIEXPORT void JNICALL
@@ -341,7 +341,6 @@ Java_com_willxing_ffmpegplayer_MainActivity_reset(JNIEnv *env, jclass clz,jstrin
 //    env->ReleaseStringUTFChars(url_, url);
     LOGE("open input stream.  == %s",url_ );
     LOGE("open input stream.  ====== %s",url );
-    player = new Player(env,clz,url);
-    player->prepare(url);
-    player->InitOpenSL(env,clz);
+    prepare(url);
+    InitOpenSL(env,clz);
 }

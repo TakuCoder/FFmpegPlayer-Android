@@ -92,7 +92,7 @@ void AVPacketQueue::clearPackets() {
     }
     pthread_mutex_unlock(&mutex);
 
-//  int  AVPacketQueue::size(queue<AVPacket *>  *queue_){
+//  int  AVPacketQueue::size(avPacketQueue<AVPacket *>  *queue_){
 //        return queue_->size();
 //  }
 
