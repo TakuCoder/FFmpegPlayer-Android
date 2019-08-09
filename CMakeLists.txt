@@ -16,6 +16,7 @@ add_library( # Specifies the name of the library.
              SHARED
              # Provides a relative path to your source file(s).
              src/main/cpp/ffmpeg_player.cpp
+        src/main/cpp/Log.h
         src/main/cpp/ffmpeg_player.h
         src/main/cpp/AVPacketQueue.h
         src/main/cpp/AVPacketQueue.cpp

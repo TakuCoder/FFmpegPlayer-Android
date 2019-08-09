@@ -84,7 +84,10 @@ void getPCM(void **pcm, size_t *pcmSize) {
     SwrContext * swr = localparams. swr;
     uint8_t * buff;
     uint8_t *tmp = outputBuffer;
-    while((&queue->audio_packets)->size() > 0 && i_time < frameNumber) {
+    while(i_time < frameNumber) {
+        if((&queue->audio_packets)->size() <= 0 ){
+            continue;
+        }
         queue->get_audio_packet(avPacket);
         LOGE("player_play_audio ==  %d  === %d", avPacket->pts, &avPacket);
         AVFrame *aFrame = av_frame_alloc();
@@ -233,6 +236,10 @@ void AudioOpensl::createBufferQueueAudioPlayer(JNIEnv* env, jclass clazz, int ra
     result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
     assert(SL_RESULT_SUCCESS == result);
 
+}
+
+void AudioOpensl::SetPlayState(unsigned int state){
+    (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, state);
 }
 
 void AudioOpensl::AudioWrite(const void*buffer, int size)

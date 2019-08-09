@@ -320,19 +320,27 @@ Java_com_willxing_ffmpegplayer_MainActivity_play(JNIEnv *env, jclass clz, jstrin
 
     player_play_audio(env,clz,url_,surface);
 
-}extern "C"
+}
+
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_willxing_ffmpegplayer_MainActivity_pause(JNIEnv *env, jobject instance) {
     LOGE("video Java_com_willxing_ffmpegplayer_MainActivity_pause error %d", 1);
-    // TODO
+    player_pause_video();
 
-}extern "C"
+}
+
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_willxing_ffmpegplayer_MainActivity_stop(JNIEnv *env, jobject instance) {
     LOGE("video Java_com_willxing_ffmpegplayer_MainActivity_stop error %d", 1);
-    // TODO
+    player_stop_video();
+}
 
-}extern "C"
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_willxing_ffmpegplayer_MainActivity_reset(JNIEnv *env, jclass clz,jstring url_) {
     LOGE("video Java_com_willxing_ffmpegplayer_MainActivity_reset error %d", 1);

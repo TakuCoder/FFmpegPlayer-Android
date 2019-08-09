@@ -20,11 +20,13 @@ extern "C"
 #include <libswresample/swresample.h>
 }
 
+
+
 int play_video(JNIEnv *env, jobject surface, AVFormatContext *pFormatCtx, AVCodecContext *pCodecCtx,
                int videoindex, AVPacketQueue *video_queue);
 
 void * putPacketToQueue(void *param);
-
+void * decode_toFrame(void *param);
 
 
 void player_play();
@@ -33,6 +35,8 @@ void player_play_audio(JNIEnv *env, jclass clz, jstring url_,
                        jobject surface);
 
 void player_play_video();
+void player_pause_video();
+void player_stop_video();
 
 int prepare(const char *input_str);
 
@@ -54,5 +58,6 @@ struct QueueTools {
     AVPacketQueue *quque;
     AVPacket *avPacket;
 };
+
 
 #endif //ANDROIDPROJECT_PLAYER_H

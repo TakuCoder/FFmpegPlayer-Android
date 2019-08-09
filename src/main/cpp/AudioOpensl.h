@@ -11,15 +11,13 @@
 #include <assert.h>
 #include "AVPacketQueue.h"
 #include <pthread.h>
+#include "Log.h"
 extern "C"
 {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
 }
-
-#define LOGE(format, ...)  __android_log_print(ANDROID_LOG_ERROR, "will_e", format, ##__VA_ARGS__)
-#define LOGI(format, ...)  __android_log_print(ANDROID_LOG_INFO,  "will_i", format, ##__VA_ARGS__)
 
 
 
@@ -71,7 +69,7 @@ public:
     void AudioWrite(const void *buffer, int size);
 
 
-
+    void SetPlayState(unsigned int);
 };
 
 struct DecodeParam{

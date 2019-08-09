@@ -4,7 +4,7 @@
 
 #include "Player.h"
 #include <android/log.h>
-
+#include <sys/time.h>
 
 extern "C"
 {
@@ -15,10 +15,6 @@ extern "C"
 #include <libswscale/swscale.h>
 
 }
-
-#define LOGE(...) ((void)__android_log_print(ANDROID_LOG_INFO, "will_E", __VA_ARGS__))
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "will_I", __VA_ARGS__))
-
 
 
 
@@ -41,6 +37,8 @@ SwrContext *swr;
 void *packetQueue;
 AudioOpensl *audioOpensl;
 
+int state = 0;
+
 int prepare(const  char *input_str ) {
     avPacketQueue = new AVPacketQueue();
     av_register_all();
@@ -57,6 +55,7 @@ int prepare(const  char *input_str ) {
     init_stream( playerParam->avformat_context,AVMEDIA_TYPE_VIDEO,-1);
     init_stream( playerParam->avformat_context,AVMEDIA_TYPE_AUDIO,-1);
     pthread_create(&avdemux_thead,NULL,putPacketToQueue,playerParam);
+    pthread_create(&vedio_decode_thead,NULL,decode_toFrame,playerParam);
 //    putPacketToQueue(avformat_context,avPacketQueue,audioStreamindex,videoStreamindex);
     return 0;
 }
@@ -82,8 +81,6 @@ int prepare(const  char *input_str ) {
      avcodec_context = avformat_context->streams[idx]->codec;
     AVCodec *decoder = avcodec_find_decoder(avcodec_context->codec_id);
      LOGE("init_stream ==  %d", avcodec_context->codec_id );
-    AVFrame *vFrame = av_frame_alloc();
-    AVPacket *avPacket = av_packet_alloc();
      LOGE("init_stream == 3");
     if (decoder == NULL) {
         LOGE("Couldn't find Codec.\n");
@@ -125,6 +122,7 @@ void * putPacketToQueue(void *param){
     AVPacket *avPacket = av_packet_alloc();
 
     while (av_read_frame(playerParam->avformat_context, avPacket) >= 0) {
+        LOGE("putPacketToQueue= %d   %x", 111,avPacket);
         if (avPacket->stream_index == playerParam->audioStreamindex) {
             avPacketQueue->put_aduio_packet(avPacket);
         }
@@ -134,15 +132,35 @@ void * putPacketToQueue(void *param){
         }
         avPacket = av_packet_alloc();
     }
+    state = 5;
     return NULL;
 }
 
 void player_play_audio(JNIEnv *env, jclass clz, jstring url_,
                                jobject surface) {
-    bqPlayerCallback(audioOpensl->bqPlayerBufferQueue, NULL);
+    if (state == 0) {
+         bqPlayerCallback(audioOpensl->bqPlayerBufferQueue, NULL);
+    }else{
+        audioOpensl->SetPlayState(SL_PLAYSTATE_PLAYING);
+    }
+    state = 1;
     play_video(env,surface,playerParam->avformat_context,playerParam->avcodec_video_context,playerParam->videoStreamindex,avPacketQueue);
 }
 
+void player_pause_video(){
+    state = 2;
+    // 暂停音乐
+    audioOpensl->SetPlayState(SL_PLAYSTATE_PAUSED);
+}
+
+void player_stop_video(){
+    state = 3;
+    audioOpensl->SetPlayState(SL_PLAYSTATE_PAUSED);
+
+    avcodec_close(playerParam->avcodec_audio_context);
+    avcodec_close(playerParam->avcodec_video_context);
+    avformat_close_input(&playerParam->avformat_context);
+}
 void InitOpenSL(JNIEnv *env,jclass  clz){
     audioOpensl = new AudioOpensl();
     int rate, channel,simpleFmt;
@@ -196,67 +214,162 @@ static void* av_demux_thread_proc(void *param){
 ANativeWindow *nativeWindow;
 ANativeWindow_Buffer windowBuffer;
 
-int  play_video(JNIEnv *env, jobject surface , AVFormatContext	*pFormatCtx,AVCodecContext	*pCodecCtx,int videoindex,AVPacketQueue *video_queue){
 
-    struct SwsContext *img_convert_ctx;
+long getCurrentTime() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+queue<AVFrame *> frame_packets;
+void * decode_toFrame(void * inParam){
+    FFmpeg_param * param =  (FFmpeg_param *)inParam;
+
+
+    int width = playerParam->avcodec_video_context->width;
+    int height = playerParam->avcodec_video_context->height;
+
+//    struct SwsContext *img_convert_ctx;
+//    img_convert_ctx = sws_getContext(width, height, playerParam->avcodec_video_context->pix_fmt,
+//                                     width, height, AV_PIX_FMT_RGBA, SWS_BICUBIC, NULL, NULL, NULL);
+    //分配一个帧指针，指向解码后的原始帧
+    AVFrame *vFrame = av_frame_alloc();
+//    AVFrame *pFrameRGBA = av_frame_alloc();
+    AVPacket *vPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
+    //读取帧
+    while(state != 3) {
+        if((&avPacketQueue->video_packets)->size() <= 0){
+            continue;
+        }
+        long start = getCurrentTime();
+//        LOGE("decode_toFrame start sysTime = %d ", start);
+        avPacketQueue->get_video_packet(vPacket);
+        LOGE("decode_toFrame sws_scale size = %d  vPacket  %x ", frame_packets.size(),vPacket);
+        if (vPacket->stream_index == playerParam->videoStreamindex) {
+            //视频解码
+            int ret = avcodec_send_packet(playerParam->avcodec_video_context, vPacket);
+            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                LOGE("video avcodec_send_packet error %d", ret);
+                return NULL;
+            }
+            LOGE("decode_toFrame sws_scale size = %d  111  %x ", frame_packets.size(),vFrame);
+            avPacketQueue->get_Item(vFrame);
+
+            LOGE("decode_toFrame sws_scale size = %d  222 %x ", frame_packets.size(),&vFrame->data);
+            ret = avcodec_receive_frame(playerParam->avcodec_video_context, vFrame);
+//            LOGE("decode_toFrame Second sysTime = %d   = %d ", getCurrentTime(), getCurrentTime() - start);
+            if (ret < 0 && ret != AVERROR_EOF) {
+                LOGE("video avcodec_receive_frame error %d", ret);
+                av_packet_unref(vPacket);
+                continue;
+            }
+//            LOGE("decode_toFrame size = %d    %x ", frame_packets.size(),pFrameRGBA);
+            //转化格式
+//            avPacketQueue->get_Item(pFrameRGBA);
+//            sws_scale(img_convert_ctx, (const uint8_t *const *) vFrame->data, vFrame->linesize, 0,
+//                      playerParam->avcodec_video_context->height,
+//                      pFrameRGBA->data, pFrameRGBA->linesize);
+//            LOGE("decode_toFrame sws_scale sysTime = %d   = %d ", getCurrentTime(), getCurrentTime() - start);
+//            avPacketQueue->put_Item(pFrameRGBA);
+//            avPacketQueue->frame_packets.push(pFrameRGBA);
+//            frame_packets.push(pFrameRGBA);
+            frame_packets.push(vFrame);
+//            vFrame = av_frame_alloc();
+            LOGE("decode_toFrame sws_scale size = %d  3333   %x     ", frame_packets.size(),&vFrame->data);
+        }
+    }
+    return NULL;
+}
+
+
+static void sleep_ms(unsigned int secs)
+
+{
+
+    struct timeval tval;
+
+    tval.tv_sec=secs/1000;
+
+    tval.tv_usec=(secs*1000)%1000000;
+
+    select(0,NULL,NULL,NULL,&tval);
+
+}
+
+int delay= 20;
+int  play_video(JNIEnv *env, jobject surface , AVFormatContext	*pFormatCtx,AVCodecContext	*pCodecCtx,int videoindex,AVPacketQueue *video_queue){
+    int width = pCodecCtx->width;
+    int height = pCodecCtx->height;
     //获取界面传下来的surface
     nativeWindow = ANativeWindow_fromSurface(env, surface);
     if (0 == nativeWindow) {
         LOGE("Couldn't get native window from surface.\n");
         return -1;
     }
-    int width = pCodecCtx->width;
-    int height = pCodecCtx->height;
-    //分配一个帧指针，指向解码后的原始帧
-    AVFrame *vFrame = av_frame_alloc();
-    AVPacket *vPacket = (AVPacket *) av_malloc(sizeof(AVPacket));
-    AVFrame *pFrameRGBA = av_frame_alloc();
-    img_convert_ctx = sws_getContext(width, height, pCodecCtx->pix_fmt,
-                                     width, height, AV_PIX_FMT_RGBA, SWS_BICUBIC, NULL, NULL, NULL);
     if (0 >
         ANativeWindow_setBuffersGeometry(nativeWindow, width, height, WINDOW_FORMAT_RGBA_8888)) {
         LOGE("Couldn't set buffers geometry.\n");
         ANativeWindow_release(nativeWindow);
         return -1;
     }
-    //读取帧
-//    while (av_read_frame(pFormatCtx, vPacket) >= 0) {
-        while((&video_queue->video_packets)->size() > 0) {
-            video_queue->get_video_packet(vPacket);
-        if (vPacket->stream_index == videoindex) {
-            //视频解码
-            int ret = avcodec_send_packet(pCodecCtx, vPacket);
-            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-                LOGE("video avcodec_send_packet error %d", ret);
-                return -1;
-            }
-            ret = avcodec_receive_frame(pCodecCtx, vFrame);
-            if (ret < 0 && ret != AVERROR_EOF) {
-                LOGE("video avcodec_receive_frame error %d", ret);
-                av_packet_unref(vPacket);
-                continue;
-            }
-            //转化格式
-            sws_scale(img_convert_ctx, (const uint8_t *const *) vFrame->data, vFrame->linesize, 0,
-                      pCodecCtx->height,
-                      pFrameRGBA->data, pFrameRGBA->linesize);
-            if (ANativeWindow_lock(nativeWindow, &windowBuffer, NULL) < 0) {
-                LOGE("cannot lock window");
-                return -1;
-            } else {
-                 av_image_fill_arrays(pFrameRGBA->data, pFrameRGBA->linesize,
-                                     (const uint8_t *) windowBuffer.bits, AV_PIX_FMT_RGBA,
-                                     width, height, 1);
-                ANativeWindow_unlockAndPost(nativeWindow);
-            }
+
+    struct SwsContext *img_convert_ctx;
+
+    img_convert_ctx = sws_getContext(width, height, playerParam->avcodec_video_context->pix_fmt,
+                                     width, height, AV_PIX_FMT_RGBA, SWS_BICUBIC, NULL, NULL, NULL);
+
+    AVFrame *pFrameRGBA = av_frame_alloc();
+    AVFrame  *vFrame;
+    while (state == 1) {
+//        if (avPacketQueue->frame_packets.size() <= 0) {
+        if (frame_packets.size() <= 0) {
+            continue;
         }
-        av_packet_unref(vPacket);
+        long start = getCurrentTime();
+        LOGE("play start sysTime = %d ", start);
+
+//        avPacketQueue->get_Item(pFrameRGBA);
+//        pFrameRGBA =  frame_packets.front();
+//        frame_packets.pop();
+
+        vFrame =  frame_packets.front();
+        frame_packets.pop();
+
+//        pFrameRGBA=   avPacketQueue->frame_packets.front();
+//        avPacketQueue->frame_packets.pop();
+
+        sws_scale(img_convert_ctx, (const uint8_t *const *) vFrame->data, vFrame->linesize, 0,
+                      playerParam->avcodec_video_context->height,
+                      pFrameRGBA->data, pFrameRGBA->linesize);
+
+        if (ANativeWindow_lock(nativeWindow, &windowBuffer, NULL) < 0) {
+            LOGE("cannot lock window");
+            return -1;
+        } else {
+//            LOGE("get_Item success = %d   %x",  getCurrentTime() - start,pFrameRGBA);
+            av_image_fill_arrays(pFrameRGBA->data, pFrameRGBA->linesize,
+                                 (const uint8_t *) windowBuffer.bits, AV_PIX_FMT_RGBA,
+                                 width, height, 1);
+            ANativeWindow_unlockAndPost(nativeWindow);
+//            av_frame_unref(pFrameRGBA);
+//            avPacketQueue->put_Item(pFrameRGBA);
+
+            av_frame_unref(vFrame);
+            avPacketQueue->put_Item(vFrame);
+        }
+        if(frame_packets.size() >1){
+            sleep_ms(delay);
+        }
+//        av_frame_free(&vFrame);
+//        av_packet_unref(vPacket);
+         delay +=(41- (getCurrentTime() - start));
+        LOGE("play end sysTime = %d   = %d ", getCurrentTime(), getCurrentTime() - start);
 //        av_free(vPacket);
     }
     //释放内存
-//    sws_freeContext(img_convert_ctx);
+    sws_freeContext(img_convert_ctx);
 //    av_free(vPacket);
-//    av_free(pFrameRGBA);
+    av_free(pFrameRGBA);
 //    avcodec_close(pCodecCtx);
 //    avformat_close_input(&pFormatCtx);
     return 0;
